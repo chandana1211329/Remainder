@@ -1,0 +1,230 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                   Int                      @id @default(autoincrement())
+  username             String                   @unique
+  password             String
+  xp                   Int                      @default(0)
+  level                Int                      @default(1)
+  currentStreak        Int                      @default(0)
+  longestStreak        Int                      @default(0)
+  settings             Settings?
+  jsProgress           UserJavaScriptProgress[]
+  dsaProgress          UserDSAProgress[]
+  assignments          UserAssignment[]
+  dailyTasks           DailyTask[]
+  revisions            RevisionSchedule[]
+  achievements         UserAchievement[]
+  notifications        Notification[]
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+}
+
+model Settings {
+  id                   Int      @id @default(autoincrement())
+  userId               Int      @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wakeupTime           String   @default("07:00")
+  morningExerciseTime  String   @default("07:30")
+  breakfastTime        String   @default("08:30")
+  lunchTime            String   @default("13:00")
+  eveningExerciseTime  String   @default("18:00")
+  dinnerTime           String   @default("20:30")
+  sleepTime            String   @default("22:30")
+  theme                String   @default("dark")
+  accentColor          String   @default("violet") // violet, blue, emerald, amber, rose
+  notifyMorning        Boolean  @default(true)
+  notifyStudy          Boolean  @default(true)
+  notifyAssignment     Boolean  @default(true)
+  notifyExercise       Boolean  @default(true)
+  notifyDinner         Boolean  @default(true)
+  notifySleep          Boolean  @default(true)
+  notifyRevision       Boolean  @default(true)
+  xpRewardJS           Int      @default(40)
+  xpRewardDSA          Int      @default(30)
+  xpRewardAssignment   Int      @default(30)
+  xpRewardRevision     Int      @default(20)
+  xpRewardExercise     Int      @default(15)
+  xpRewardSleep        Int      @default(20)
+}
+
+model JavaScriptTopic {
+  id                Int                      @id @default(autoincrement())
+  category          String                   // Basics, Functions, Events, etc.
+  title             String                   @unique
+  description       String                   @db.Text
+  estimatedTime     Int                      // in minutes
+  difficulty        String                   // Easy, Medium, Hard
+  orderNumber       Int
+  practiceQuestions String                   @db.Text // JSON string
+  interviewQuestions String                  @db.Text // JSON string
+  relatedProject    String                   @db.Text
+  userProgress      UserJavaScriptProgress[]
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+}
+
+model UserJavaScriptProgress {
+  id               Int             @id @default(autoincrement())
+  userId           Int
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId          Int
+  topic            JavaScriptTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  status           String          @default("locked") // locked, unlocked, completed
+  completionDate   DateTime?
+  confidenceRating Int?            // 1 to 5
+  notes            String?         @db.LongText
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([userId, topicId])
+}
+
+model DSATopic {
+  id                 Int               @id @default(autoincrement())
+  category           String            // Arrays, Strings, Linked Lists, etc.
+  difficulty         String            // Easy, Medium, Hard
+  problemsCount      Int               @default(0) // total problems available/solved in category
+  userProgress       UserDSAProgress[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  
+  @@unique([category, difficulty])
+}
+
+model UserDSAProgress {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dsaTopicId     Int
+  dsaTopic       DSATopic @relation(fields: [dsaTopicId], references: [id], onDelete: Cascade)
+  problemsSolved Int      @default(0)
+  easyCount      Int      @default(0)
+  mediumCount    Int      @default(0)
+  hardCount      Int      @default(0)
+  status         String   @default("not_started") // not_started, in_progress, completed
+  notes          String?  @db.LongText
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, dsaTopicId])
+}
+
+model Assignment {
+  id             Int              @id @default(autoincrement())
+  name           String
+  description    String           @db.Text
+  deadline       DateTime
+  userAssignment UserAssignment[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model UserAssignment {
+  id             Int        @id @default(autoincrement())
+  userId         Int
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignmentId   Int
+  assignment     Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  status         String     @default("pending") // pending, completed
+  completionDate DateTime?
+  notes          String?    @db.Text
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([userId, assignmentId])
+}
+
+model DailyTask {
+  id             Int       @id @default(autoincrement())
+  userId         Int
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date           DateTime  // The day this task is tracked for (e.g. YYYY-MM-DD)
+  
+  // Required task completions
+  jsCompleted    Boolean   @default(false)
+  dsaCompleted   Boolean   @default(false)
+  assignmentCompleted Boolean @default(false)
+  morningExCompleted Boolean @default(false)
+  eveningExCompleted Boolean @default(false)
+  sleepCompleted Boolean   @default(false)
+  
+  // Optional tasks
+  breakfastCompleted Boolean @default(false)
+  lunchCompleted Boolean   @default(false)
+  dinnerCompleted Boolean  @default(false)
+  waterIntakeML  Int       @default(0) // optional water intake
+  meditationMin  Int       @default(0) // optional meditation minutes
+  readingMin     Int       @default(0) // optional reading minutes
+  
+  // Completion times
+  jsTime         DateTime?
+  dsaTime        DateTime?
+  assignmentTime DateTime?
+  morningExTime  DateTime?
+  eveningExTime  DateTime?
+  sleepTime      DateTime?
+  breakfastTime  DateTime?
+  lunchTime      DateTime?
+  dinnerTime     DateTime?
+  
+  notes          String?   @db.Text
+  mood           String?   // happy, productive, tired, stressed, calm
+  xpEarned       Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, date])
+}
+
+model RevisionSchedule {
+  id             Int                    @id @default(autoincrement())
+  userId         Int
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId        Int
+  topicTitle     String
+  topicCategory  String
+  intervalDays   Int                    // 1, 3, 7, 15, 30
+  dueDate        DateTime
+  completedDate  DateTime?
+  status         String                 @default("pending") // pending, completed, missed
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+}
+
+model Achievement {
+  id             Int               @id @default(autoincrement())
+  code           String            @unique // e.g. STREAK_7, JS_BASICS_COMPLETED
+  title          String
+  description    String
+  icon           String            // React Icon identifier
+  xpValue        Int               @default(50)
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id             Int         @id @default(autoincrement())
+  userId         Int
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId  Int
+  achievement    Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt     DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+}
+
+model Notification {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  message        String
+  type           String   // alert, reminder, achievement, level_up
+  read           Boolean  @default(false)
+  scheduledTime  DateTime
+  createdAt      DateTime @default(now())
+}
